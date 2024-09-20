@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ESP32-WirelessUSB Dashboard</title>
+    <script>
+        function sendCommand() {
+            var commandInput = document.getElementsByName("commandInput")[0].value;
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("response").innerHTML = this.responseText;
+                }
+            };
+            xhttp.open("GET", "/command?commandInput=" + commandInput, true);
+            xhttp.send();
+            return false;
+        }
+    </script>
+</head>
+<body>
+    <h1>ESP32-WirelessUSB Dashboard</h1>
+
+    <form onsubmit="return sendCommand();">
+        <input type="text" name="commandInput">
+        <input type="submit" value="Submit">
+    </form><br>
+
+    <div id="response"></div>
+
+</body>
+</html>
