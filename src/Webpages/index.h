@@ -1,3 +1,8 @@
+#ifndef WEBPAGE_H
+#define WEBPAGE_H
+
+const char* webpage = R"=====(
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -7,22 +12,8 @@
         var Constants = {
             waitPrefix: "WAS/",
             waitHead: "WT/",
-            waitSuffix: "WAE/",
-            ConnamdEnd: ";;",
-            MultiKeyPartion: "--",
-            MultiKeyPrefix: "$",
-            MousePrefix: "@",
-            MediaPrefix: "MDI/",
-            SystemPrefix: "SYS/"
+            waitSuffix: "WAE/"
         };
-
-        var tableHeader = ["KEY $", "MOUSE @", "MEDIA MDI/", "SYSTEM SYS/"];
-        var tableData = [
-            ["LEFT_CTRL", "LEFT_SHIFT", "LEFT_ALT", "LEFT_GUI", "RIGHT_CTRL", "RIGHT_SHIFT", "RIGHT_ALT", "RIGHT_GUI", "UP_ARROW", "DOWN_ARROW", "LEFT_ARROW", "RIGHT_ARROW", "MENU", "SPACE", "BACKSPACE", "TAB", "RETURN", "ESC", "INSERT", "DELETE", "PAGE_UP", "PAGE_DOWN", "HOME", "END", "NUM_LOCK", "CAPS_LOCK", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23", "F24", "PRINT_SCREEN", "SCROLL_LOCK", "PAUSE"],
-            ["LEFT", "RIGHT", "MIDDLE", "BACKWARD", "FORWARD", "ALL"],
-            ["VOLUME_UP", "VOLUME_DOWN", "MUTE", "PLAY_PAUSE", "STOP", "BRIGHTNESS_UP", "BRIGHTNESS_DOWN"],
-            ["POWER_OFF", "STANDBY", "WAKE_HOST"]
-        ];
 
         var Joystick = {
             active: false,
@@ -98,7 +89,7 @@
                 if (this.active && !(normalizedX === 0 && normalizedY === 0)) {
                     if (!this.commandInterval) {
                         this.commandInterval = setInterval(function() {
-                            // console.log(command2Send);
+                            console.log(command2Send);
                             CommandSender.sendCommand(command2Send);
                         }, 10);
                     }
@@ -119,7 +110,8 @@
             onMouseUp: function() {
                 clearInterval(this.commandInterval);
                 this.commandInterval = null;
-                if (this.active) CommandSender.sendCommand('@MOVE0,0,0,0');
+                CommandSender.sendCommand('@MOVE0,0,0,0');
+
                 this.active = false;
                 this.stickPos.x = this.center.x;
                 this.stickPos.y = this.center.y;
@@ -135,7 +127,7 @@
 
         var CommandSender = {
             sendHttpRequest: function(command) {
-                return new Promise((resolve, reject) => {
+                return new Promise((resolve, reject) => { // 返回一個 Promise 以便可以使用 await
                     var xhttp = new XMLHttpRequest();
                     xhttp.onreadystatechange = function() {
                         if (this.readyState == 4) {
@@ -196,43 +188,7 @@
             }
         };
 
-        function createTable() {
-            var table = document.createElement("table");
-            var thead = document.createElement("thead");
-            var tbody = document.createElement("tbody");
-
-            var tr = document.createElement("tr");
-            tableHeader.forEach(function(header) {
-                var th = document.createElement("th");
-                th.textContent = header;
-                tr.appendChild(th);
-            });
-            thead.appendChild(tr); 
-            table.appendChild(thead);
-
-            var maxDataLength = Math.max(...tableData.map(arr => arr.length));
-
-            for (var i = 0; i < maxDataLength; i++) {
-                var tr = document.createElement("tr");
-                for (var j = 0; j < tableHeader.length; j++) {
-                    var td = document.createElement("td");
-
-                    td.textContent = tableData[j][i] || "";;
-
-                    td.addEventListener("click", function() {
-                        console.log(this.textContent);
-                    });
-
-                    tr.appendChild(td);
-                }
-                tbody.appendChild(tr);
-            }
-
-            table.appendChild(tbody);
-            document.getElementById("tableContainer").appendChild(table);
-        }
-
-        function createJoystick() {
+        window.onload = function() {
             Joystick.draw();
             var canvas = document.getElementById("joystick");
             canvas.addEventListener("mousedown", function(e) { Joystick.onMouseDown(e); });
@@ -249,15 +205,6 @@
                 Joystick.onMouseMove(e);
             });
             canvas.addEventListener("touchend", function() { Joystick.onMouseUp(); });
-        }
-
-        function initialize() {
-            createTable();
-            createJoystick();
-        }
-
-        window.onload = function() {
-            initialize();
         };
 
         window.sendCommandFromExternal = function(command) {
@@ -317,7 +264,7 @@
             font-size: 16px;
             margin-right: 10px;
             transition: background-color 0.3s;
-            width: auto;
+            width: auto; /* 根據內容自適應 */
         }
     
         button:hover {
@@ -338,15 +285,12 @@
             background-color: #fff; /* 背景顏色 */
         }
     
-        .styled-label {
-            font-family: 'Arial', sans-serif;
+        label {
+            margin-top: 15px;
+            display: block;
             font-size: 16px;
-            color: #333;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-            display: inline-block;
         }
-
+    
         select {
             width: calc(100%);
             padding: 10px;
@@ -401,7 +345,6 @@
             height: 15px;
             background: #2857a7;
             cursor: pointer;
-            border-radius: 5px;
         }
     
         input[type="range"]::-moz-range-thumb {
@@ -447,105 +390,133 @@
                 padding: 8px 10px;
             }
         }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: #2857a7;
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
     </style>
     
 </head>
 <body>
     <h1>ESP32-WirelessUSB Dashboard</h1>
 
-    <div id="mainControl" class="container">
-        <label for="commandInput" class="styled-label">Command:</label>
-        <input type="text" name="commandInput">
-        <button id='sendCommandFromExternal' onclick="CommandSender.sendCommand();">Submit</button><br><br>
-        <div id="response">Ready For Command</div><br>
 
-        <select id="dropdown">
-            <option value=";;">CommandEnd</option>
-            <option value="--">MultiKeyPartion</option>
-            <option value="$">MultiKey</option>
-            <option value="@">Mouse</option>
-            <option value="MDI/">Media</option>
-            <option value="SYS/">System</option>
-        </select>
-        <button onclick="TextInserter.insertFromSelect()">AddSymbol</button><br><br>
+    <input type="text" name="commandInput">
+    <button id='sendCommandFromExternal' onclick="CommandSender.sendCommand();">Submit</button><br><br>
+    <div id="response">Ready For Command</div><br>
 
-        <label for="waitTime" class="styled-label">Wait Time (ms):</label>
-        <input type="number" id="waitTime" min="0" value="1000">
-        <button onclick="TextInserter.addWaitCommand()">Add Wait Command</button><br><br>
+    <button onclick="TextInserter.insert(';;')">CommandEnd</button>
+    <button onclick="TextInserter.insert('--')">ActionEnd</button>
+    <button onclick="TextInserter.insert('$')">MultiKey</button>
+    <button onclick="TextInserter.insert('@')">Mouse</button>
+    <button onclick="TextInserter.insert('MDI/')">Media</button>
+    <button onclick="TextInserter.insert('SYS/')">System</button><br>
 
-        <select id="dropdown">
-            <option value="$LEFT_ALT--F4">CloseTab</option>
-            <option value="$LEFT_GUI--rWAS/WT/100WAE/https://www.youtube.com/watch?v=dQw4w9WgXcQWAS/WT/500WAE/$RETURN">RickRoll</option>
-            <option value="@LEFT">MOUSE_LEFT</option>
-            <option value="$LEFT_GUI">WINDOWS</option>
-            <option value="$LEFT_SHIFT">SHIFT</option>
-            <option value="$LEFT_CTRL">CTRL</option>
-        </select>
-        <button onclick="CommandSender.sendFromSelect()">RunScript</button>
-    </div>
+    <label for="waitTime">Wait Time (ms):</label>
+    <input type="number" id="waitTime" min="0" value="1000">
+    <button onclick="TextInserter.addWaitCommand()">Add Wait Command</button><br><br>
+
+    <select id="dropdown">
+        <option value="$LEFT_ALT--F4">CloseTab</option>
+        <option value="$LEFT_GUI--rWAS/WT/100WAE/https://www.youtube.com/watch?v=dQw4w9WgXcQWAS/WT/500WAE/$RETURN">RickRoll</option>
+        <option value="@LEFT">MOUSE_LEFT</option>
+        <option value="$LEFT_GUI">WINDOWS</option>
+        <option value="$LEFT_SHIFT">SHIFT</option>
+        <option value="$LEFT_CTRL">CTRL</option>
+    </select>
+    <button onclick="TextInserter.insertFromSelect()">AddAction</button>
+    <button onclick="CommandSender.sendFromSelect()">RunAction</button><br><br>
+
+    <label for="joystickMultiplier">Cursor Speed:</label>
+    <input type="range" id="joystickMultiplier" min="1" max="10" value="1">
+    <span id="multiplierValue">1</span><br><br>
     
-    <div id="cursorControl" class="container">
-        <label for="joystickMultiplier" class="styled-label">Cursor Speed:</label>
-        <input type="range" id="joystickMultiplier" min="1" max="10" value="1">
-        <span id="multiplierValue">1</span><br><br>
-        
-        <canvas id="joystick" width="300" height="300" style="border:1px solid #000;"></canvas>
-    </div>
+    <canvas id="joystick" width="300" height="300" style="border:1px solid #000;"></canvas><br><br>
 
-    <div id="quickCommand" class="container"> 
-        <label class="switch">
-            <input type="checkbox" id="InstantRun">
-            <span class="slider"></span>
-        </label>
-        <label for="InstantRun", class="styled-label">InstantRun</label>
-        <div id="tableContainer"></div>
-    </div>
-    
+    <table>
+        <tr>
+            <th>KEY</th>
+            <th>MOUSE</th>
+            <th>MEDIA</th>
+            <th>SYSTEM</th>
+        </tr>
+        <tr>
+            <td>
+                LEFT_CTRL<br>
+                LEFT_SHIFT<br>
+                LEFT_ALT<br>
+                LEFT_GUI<br>
+                RIGHT_CTRL<br>
+                RIGHT_SHIFT<br>
+                RIGHT_ALT<br>
+                RIGHT_GUI<br>
+                UP_ARROW<br>
+                DOWN_ARROW<br>
+                LEFT_ARROW<br>
+                RIGHT_ARROW<br>
+                MENU<br>
+                SPACE<br>
+                BACKSPACE<br>
+                TAB<br>
+                RETURN<br>
+                ESC<br>
+                INSERT<br>
+                DELETE<br>
+                PAGE_UP<br>
+                PAGE_DOWN<br>
+                HOME<br>
+                END<br>
+                NUM_LOCK<br>
+                CAPS_LOCK<br>
+                F1<br>
+                F2<br>
+                F3<br>
+                F4<br>
+                F5<br>
+                F6<br>
+                F7<br>
+                F8<br>
+                F9<br>
+                F10<br>
+                F11<br>
+                F12<br>
+                F13<br>
+                F14<br>
+                F15<br>
+                F16<br>
+                F17<br>
+                F18<br>
+                F19<br>
+                F20<br>
+                F21<br>
+                F22<br>
+                F23<br>
+                F24<br>
+                PRINT_SCREEN<br>
+                SCROLL_LOCK<br>
+                PAUSE
+            </td>
+            <td>
+                LEFT<br>
+                RIGHT<br>
+                MIDDLE<br>
+                BACKWARD<br>
+                FORWARD<br>
+                ALL
+            </td>
+            <td>
+                VOLUME_UP<br>
+                VOLUME_DOWN<br>
+                MUTE<br>
+                PLAY_PAUSE<br>
+                STOP<br>
+                BRIGHTNESS_UP<br>
+                BRIGHTNESS_DOWN
+            </td>
+            <td>
+                POWER_OFF<br>
+                STANDBY<br>
+                WAKE_HOST
+            </td>
+        </tr>
+    </table>
+
     <script>
         var multiplierInput = document.getElementById("joystickMultiplier");
         var multiplierDisplay = document.getElementById("multiplierValue");
@@ -555,3 +526,8 @@
     </script>
 </body>
 </html>
+
+
+)=====";
+
+#endif
