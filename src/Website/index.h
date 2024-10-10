@@ -168,7 +168,7 @@ const char* webpage = R"=====(
                 
                 const multiplier = document.getElementById("joystickMultiplier").value;
                 var direction = e.deltaY > 0 ? 1 : -1;
-                CommandSender.sendCommand(`${Constants.mousePrefix}MOVE0,0,${direction * 5 * multiplier},0`)
+                CommandSender.sendCommand(`${Constants.mousePrefix}MOVE0,0,${direction * 2 * multiplier},0`)
 
 
                 if (!this.scrolling) {
@@ -469,6 +469,8 @@ const char* webpage = R"=====(
             uploadFirmware: function() {
                 var request = new XMLHttpRequest();
 
+                document.getElementById('firmwareFileinput').disabled = true;
+                document.getElementById('updateFirmwareBtn').disabled = true;
 
                 request.onerror = function() { StatusBar.updateFirmware('ERROR: Connection error!'); };
                 request.ontimeout = function() { StatusBar.updateFirmware('ERROR: Connection timeout!'); };
@@ -479,15 +481,11 @@ const char* webpage = R"=====(
                     }
 
                     if (this.readyState == 4) {
-                        switch (this.status) {
-                            case 200 :
-                                StatusBar.updateFirmware(this.responseText);
-                                // window.fileSelection.value = '';
-                                // window.fileSelection.disabled = false;
-                                // window.uploadFileButton.disabled = true;
-                                break;
-                            default :  StatusBar.updateFirmware('http result code: ' + this.status);
-                        }
+                        if (this.status == 200) StatusBar.updateFirmware(this.responseText);
+                        else StatusBar.updateFirmware('ERROR: http result code: ' + this.status);
+
+                        document.getElementById('firmwareFileinput').disabled = false;
+                        document.getElementById('updateFirmwareBtn').disabled = false;
                     }
                 }
 
@@ -981,11 +979,11 @@ const char* webpage = R"=====(
     <div id="firmware" class="container">
         <div id="dataResponse" style="margin-bottom: 10px;">Select Firmware</div>
         <form method='POST' action='/updateFirmware' enctype='multipart/form-data' class="flex-container">
-            <input type="file" id="firmwareFileinput" accept=".bin", onchange="FileManager.handleFirmwareUplaod()">
+            <input type="file" id="firmwareFileinput" accept=".bin" onchange="FileManager.handleFirmwareUplaod()" disabled="false">
             <label class="custom-file-upload" for="firmwareFileinput">Upload firmware</label> 
             <div id="firmwareFileName" class="file-name">No file selected</div>
             <progress id="uploadProgressBar" value="0" max="0"></progress>
-            <input id="updateFirmwareBtn" class="stickRightBtn" type='submit' value='Update Firmware'>
+            <input id="updateFirmwareBtn" class="stickRightBtn" type='submit' value='Update Firmware' disabled="false">
         </form>
     </div>
 

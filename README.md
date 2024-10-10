@@ -4,8 +4,6 @@ HID-BadUSB
 ![license MIT](https://img.shields.io/badge/license-MIT-blue)
 
 > 2024 &copy; alanwu-9852
-> 
-> Language: English / [繁體中文](./README.zh-TW.md)
 
 This project provides a web-based interface for generating BadUSB payloads. The payloads are generated in the form of Arduino code, which can be compiled and uploaded to ESP32-S3 DevKitC-1. The payloads are designed to be executed by the board when it is connected to a computer, and can be used to perform various tasks such as keystroke injection, mouse emulation, and more.
 
@@ -76,3 +74,36 @@ You can upload a costume script file `.usbhidscript` by clicking the **Upload Sc
     ]
 }
 ```
+
+### Mouse Emulation
+The board can also emulate a mouse. The mouse can be controlled by the Pannl look like a Joystick, wheel can be controlled by the slider. Mouse can also be controlled by the command input.
+
+### OTA Updates
+The board supports OTA updates. You can upload a new firmware file by clicking the **Upload Firmware** button. The firmware file should be in the form of a `.bin` file.
+After uploading the firmware, click the **Update Firmware** button to update the board's firmware. The board will automatically restart after the update is complete. After the update, you need to refresh the page to reconnect to the board.
+
+### Command Syntax
+* **Keyboard Prefix:** `$` Need to be added before the keyboard command. e.g. `$RETURN`
+
+* **MultiKey Partion:** `--` Add between two keys to press them at the same time. You don't need `$` after `--`.
+e.g. `$LEFT_CTRL--LEFT_ALT--DELETE`
+
+* **Mouse Prefix:** `@` Need to be added before the mouse command. To move the mouse, use the format `@MOVE<x>,<y>,<v>,<h>`(v for vertical, h for horizontal). To click the mouse, use the format `@<button>`. e.g. `@MOVE100,100,0,0`, `@LEFT`
+
+* **Media Prefix:** `MDI/` Need to be added before the media command. e.g. `MDI/VOLUME_UP`
+
+* **System Prefix:** `SYS/` Need to be added before the system command. e.g. `SYS/POWER_OFF`
+
+* **Command End:** `;;` Add between two commands to separate them. e.g. `$RETURN;;@100,100,0,0` move (100, 100) relativly and press enter.
+
+* **Wait Command:** `WAS/WT/<time>WAE/` If replace `;;` with `WAS/WT/<time>WAE/`, the command will wait for `<time>` milliseconds before executing the next command. e.g. `$LEFT_CTRLWAS/WT/1000WAE/$LEFT_SHIFT` press left control, wait for 1 second(1000ms), then press left shift. [Wait Command Editor](#3-wait-command-editor) can generate easily.
+
+Libraries
+---
+This project depends on the following libraries, which are automatically installed when you build the project:
+* [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+* [AsyncTCP](https://github.com/me-no-dev/AsyncTCP)
+
+Contribution
+---
+Contributions are welcome! Feel free to open an issue or submit a pull request on GitHub.

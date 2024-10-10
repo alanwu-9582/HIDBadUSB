@@ -10,4 +10,4 @@ def html_to_header(input_html_file, output_h_file):
         h_file.write('\n\n)=====";\n\n')
         h_file.write("#endif\n")
 
-html_to_header('test\index.html', 'test\index.h')
+html_to_header('Website-workshop\index.html', 'src\Website\index.h')
