@@ -1,14 +1,15 @@
 #include <Arduino.h>
-// #include <ArduinoOTA.h>
 
 #include "password.h"
 #include "Subsystems/USBHIDController.h"
 #include "Subsystems/WifiServerSubsystem.h"
 #include "Commands/WifiServerCmd.h"
+#include "Subsystems/SleepManager.h"
 
 USBHIDController Controller;
 WifiServerSubsystem WifiServer(ssid, password);
 WifiServerCmd ServerCmd(WifiServer, Controller);
+SleepManager sleepManager;
 
 void setup() {
 	Serial.begin(115200);
@@ -17,6 +18,7 @@ void setup() {
 	Serial.println(WifiServer.initWifi());
 
 	ServerCmd.begin();
+	sleepManager.begin();
 }
 
 void loop() {

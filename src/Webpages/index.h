@@ -7,7 +7,7 @@ const char* webpage = R"=====(
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ESP32-WirelessUSB Dashboard</title>
+    <title>HID-BadUSB Dashboard</title>
     <script>
         var Constants = {
             waitPrefix: "WAS/",
@@ -228,7 +228,7 @@ const char* webpage = R"=====(
                             
                             document.getElementById("ICTempValue").textContent = response[0];
                             document.getElementById("heapValue").textContent = Math.round(Number(response[1]) / 1024, 2);
-                            document.getElementById("uptimeValue").textContent = StatusBar.msToTime(Number(response[2]));
+                            document.getElementById("uptimeValue").textContent = StatusBar.convertMicroseconds(Number(response[2]));
                         }
                     }
                 };
@@ -236,17 +236,17 @@ const char* webpage = R"=====(
                 xhttp.send();
             },
 
-            msToTime: function (duration) {
-                var milliseconds = Math.floor((duration % 1000) / 100),
-                    seconds = Math.floor((duration / 1000) % 60),
-                    minutes = Math.floor((duration / (1000 * 60)) % 60),
-                    hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+            convertMicroseconds: function (microseconds) {
+                const seconds = microseconds / 1e6;
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const remainingSeconds = (seconds % 3600) % 60;
 
-                hours = (hours < 10) ? "0" + hours : hours;
-                minutes = (minutes < 10) ? "0" + minutes : minutes;
-                seconds = (seconds < 10) ? "0" + seconds : seconds;
+                const formattedHours = String(hours).padStart(2, '0');
+                const formattedMinutes = String(minutes).padStart(2, '0');
+                const formattedSeconds = String(remainingSeconds.toFixed(3)).padStart(6, '0');
 
-                return hours + ":" + minutes + ":" + seconds + "." + milliseconds;
+                return `${formattedHours} hr : ${formattedMinutes} min : ${formattedSeconds} sec`;
             }
         };
 
@@ -971,7 +971,7 @@ const char* webpage = R"=====(
             <div>
                 <p>IC Temperature: <span id="ICTempValue">Unknown</span> Celsius</p>
                 <p>Free Heap: <span id="heapValue">Unknown</span> KB</p>
-                <p>Uptime: <span id="uptimeValue">Unknown</span> Miliseconds</p>
+                <p>Uptime: <span id="uptimeValue">Unknown</span></p>
             </div>
             
             <button id="refreshButton" class="stickRightBtn" onclick="StatusBar.refreshICState()">Refresh</button>
@@ -989,8 +989,8 @@ const char* webpage = R"=====(
         </form>
     </div>
 
-    <footer style="padding: 10px;">
-        HID-BadUSB MIT License | <a href="https://github.com/alanwu-9582">alanwu-9582</a>
+    <footer style="padding: 20px;">
+        HID-BadUSB MIT License | <a href="https://github.com/alanwu-9582/HIDBadUSB">Project Repository</a>
     </footer>
 </body>
 </html>
