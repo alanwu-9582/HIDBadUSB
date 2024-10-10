@@ -3,6 +3,7 @@
 
 #include "utils/StringUtils.h"
 #include "Subsystems/USBHIDController.h"
+#include "Subsystems/ICStateMonitor.h"
 #include "WifiServerCmd.h"
 #include "Webpages/index.h"
 
@@ -18,6 +19,8 @@ const string multiKeyPrefix = "$";
 const string mousePrefix = "@";
 const string mediaPrefix = "MDI/";
 const string systemPrefix = "SYS/";
+
+ICStateMonitor icStateMonitor;
 
 WifiServerCmd::WifiServerCmd(WifiServerSubsystem& wifiServer, USBHIDController& controller)
 : wifiServer(wifiServer), controller(controller) {}
@@ -76,6 +79,16 @@ void WifiServerCmd::setupServer() {
         } else {
             request->send(200, "text/plain", "[ERROR] No message sent");
         }
+    });
+
+    wifiServer.registeRouteProcessor("/icstate", [this](AsyncWebServerRequest* request) {
+        icStateMonitor.updateState();
+
+        String response = String(icStateMonitor.getTemperature()) + "," +
+                          String(icStateMonitor.getFreeHeap()) + "," +
+                          String(icStateMonitor.getUptime());
+
+        request->send(200, "text/plain", response);
     });
 
     wifiServer.begin();

@@ -12,7 +12,13 @@ const char* webpage = R"=====(
         var Constants = {
             waitPrefix: "WAS/",
             waitHead: "WT/",
-            waitSuffix: "WAE/"
+            waitSuffix: "WAE/",
+            connamdEnd: ";;",
+            multiKeyPartion: "--",
+            multiKeyPrefix: "$",
+            mousePrefix: "@",
+            mediaPrefix: "MDI/",
+            systemPrefix: "SYS/"
         };
 
         var Joystick = {
@@ -23,6 +29,31 @@ const char* webpage = R"=====(
             stickPos: { x: 150, y: 150 },
             lastStickPos: { x: 150, y: 150 },
             commandInterval: null,
+
+            initiJoysitck: function() {
+                var multiplierDisplay = document.getElementById("multiplierValue");
+                var multiplierInput = document.getElementById("joystickMultiplier");
+                multiplierInput.oninput = function() {
+                    multiplierDisplay.textContent = this.value;
+                };
+
+                this.draw();
+                var canvas = document.getElementById("joystick");
+                canvas.addEventListener("mousedown", function(e) { Joystick.onMouseDown(e); });
+                canvas.addEventListener("mousemove", function(e) { Joystick.onMouseMove(e); });
+                canvas.addEventListener("mouseup", function() { Joystick.onMouseUp(); });
+                canvas.addEventListener("mouseleave", function() { Joystick.onMouseUp(); });
+
+                canvas.addEventListener("touchstart", function(e) {
+                    e.preventDefault();
+                    Joystick.onMouseDown(e);
+                });
+                canvas.addEventListener("touchmove", function(e) {
+                    e.preventDefault();
+                    Joystick.onMouseMove(e);
+                });
+                canvas.addEventListener("touchend", function() { Joystick.onMouseUp(); });
+            },
 
             draw: function() {
                 var canvas = document.getElementById("joystick");
@@ -82,14 +113,14 @@ const char* webpage = R"=====(
                 var normalizedX = (this.stickPos.x - this.center.x) / (this.radius - this.stickRadius);
                 var normalizedY = (this.stickPos.y - this.center.y) / (this.radius - this.stickRadius);
                 var multiplier = document.getElementById("joystickMultiplier").value;
-                var command2Send = `@MOVE${Math.round(normalizedX.toFixed(2) * 10 * multiplier)},${Math.round(normalizedY.toFixed(2) * 10 * multiplier)},0,0`;
+                var command2Send = `${Constants.mousePrefix}MOVE${Math.round(normalizedX.toFixed(2) * 10 * multiplier)},${Math.round(normalizedY.toFixed(2) * 10 * multiplier)},0,0`;
 
                 this.draw();
 
                 if (this.active && !(normalizedX === 0 && normalizedY === 0)) {
                     if (!this.commandInterval) {
                         this.commandInterval = setInterval(function() {
-                            console.log(command2Send);
+                            // console.log(command2Send);
                             CommandSender.sendCommand(command2Send);
                         }, 10);
                     }
@@ -110,8 +141,7 @@ const char* webpage = R"=====(
             onMouseUp: function() {
                 clearInterval(this.commandInterval);
                 this.commandInterval = null;
-                CommandSender.sendCommand('@MOVE0,0,0,0');
-
+                if (this.active) CommandSender.sendCommand('@MOVE0,0,0,0');
                 this.active = false;
                 this.stickPos.x = this.center.x;
                 this.stickPos.y = this.center.y;
@@ -119,15 +149,92 @@ const char* webpage = R"=====(
             }
         };
 
+        var Slider = {
+            scrolling: false,
+            touchStartY: 0,
+
+            initSlider : function() {
+                var sliderSimulator = document.getElementById('sliderSimulator')
+                sliderSimulator.addEventListener('wheel', function(e) { Slider.simulateScroll(e); });
+                sliderSimulator.addEventListener('touchstart', function(e) { Slider.handleTouchStart(e); });
+                sliderSimulator.addEventListener('touchmove', function(e) { Slider.handleTouchMove(e); });
+            },
+
+            simulateScroll: function(e) {
+                e.preventDefault();
+                var sliderSimulator = document.getElementById('sliderSimulator')
+                
+                var multiplier = document.getElementById("joystickMultiplier").value;
+                var direction = e.deltaY > 0 ? 1 : -1;
+                CommandSender.sendCommand(`${Constants.mousePrefix}MOVE0,0,${direction * 10 * multiplier},0`)
+
+                if (!this.scrolling) {
+                    this.scrolling = true;
+
+                    if (e.deltaY > 0) {
+                        sliderSimulator.classList.add('scrolling-down');
+                        sliderSimulator.classList.remove('scrolling-up');
+                    } else {
+                        sliderSimulator.classList.add('scrolling-up');
+                        sliderSimulator.classList.remove('scrolling-down');
+                    }
+
+                    clearTimeout(sliderSimulator.stopScroll);
+                    sliderSimulator.stopScroll = setTimeout(() => {
+                        this.scrolling = false;
+                        sliderSimulator.classList.remove('scrolling-up', 'scrolling-down');
+                    }, 300);
+                }
+            },
+
+            
+            handleTouchStart: function(e) {
+                e.preventDefault()
+                this.touchStartY = e.touches[0].clientY;
+            },
+
+            handleTouchMove: function(e) {
+                e.preventDefault()
+                if (!this.touchStartY) {
+                    return;
+                }
+
+                const touchY = e.touches[0].clientY;
+                const deltaY = this.touchStartY - touchY;
+
+                this.simulateScroll({ deltaY: deltaY });
+
+                this.touchStartY = touchY;
+                alert("touchMove")
+            }
+        }
+
         var StatusBar = {
             update: function(status) {
                 document.getElementById("response").innerHTML = status;
+            },
+
+            refreshICState: function() {
+                var xhttp = new XMLHttpRequest();
+                xhttp.onreadystatechange = function() {
+                    if (this.readyState == 4) {
+                        if (this.status == 200) {
+                            var response = this.responseText.split(",");
+                            
+                            document.getElementById("ICTempValue").textContent = response[0];
+                            document.getElementById("heapValue").textContent = response[1];
+                            document.getElementById("uptimeValue").textContent = response[2];
+                        }
+                    }
+                };
+                xhttp.open("GET", "/icstate", true);
+                xhttp.send();
             }
         };
 
         var CommandSender = {
             sendHttpRequest: function(command) {
-                return new Promise((resolve, reject) => { // 返回一個 Promise 以便可以使用 await
+                return new Promise((resolve, reject) => {
                     var xhttp = new XMLHttpRequest();
                     xhttp.onreadystatechange = function() {
                         if (this.readyState == 4) {
@@ -147,7 +254,7 @@ const char* webpage = R"=====(
                 var commandInput = command || document.getElementsByName("commandInput")[0].value;
                 
                 var commands = commandInput.split(new RegExp(Constants.waitPrefix + "|" + Constants.waitSuffix)).filter(Boolean);
-                console.log(commands);
+                // console.log(commands);
                 for (let cmd of commands) {
                     if (cmd.startsWith(Constants.waitHead)) {
                         var time = parseInt(cmd.substring(3).trim());
@@ -164,9 +271,24 @@ const char* webpage = R"=====(
             },
 
             sendFromSelect: function() {
-                var select = document.getElementById("dropdown");
+                var select = document.getElementById("scriptDropdown");
                 var selectedValue = select.value;
                 this.sendCommand(selectedValue);
+            },
+
+            refreshICState: function() {
+                var xhttp = new XMLHttpRequest();
+                xhttp.onreadystatechange = function() {
+                    if (this.readyState == 4) {
+                        if (this.status == 200) {
+                            StatusBar.update();
+                        }
+                    }
+                };
+                xhttp.open("GET", "/command?commandInput=" + command, true);
+                xhttp.send();
+
+                resolve();
             }
         };
 
@@ -176,8 +298,8 @@ const char* webpage = R"=====(
                 inputField.value += text;
             },
 
-            insertFromSelect: function() {
-                var select = document.getElementById("dropdown");
+            insertFromSelect: function(from) {
+                var select = document.getElementById(from);
                 var selectedValue = select.value;
                 this.insert(selectedValue);
             },
@@ -185,26 +307,98 @@ const char* webpage = R"=====(
             addWaitCommand: function () {
                 var waitTime = document.getElementById("waitTime").value;
                 this.insert(Constants.waitPrefix + Constants.waitHead + waitTime + Constants.waitSuffix);
+            },
+
+            clear : function() {
+                document.getElementsByName("commandInput")[0].value = "";
             }
         };
 
-        window.onload = function() {
-            Joystick.draw();
-            var canvas = document.getElementById("joystick");
-            canvas.addEventListener("mousedown", function(e) { Joystick.onMouseDown(e); });
-            canvas.addEventListener("mousemove", function(e) { Joystick.onMouseMove(e); });
-            canvas.addEventListener("mouseup", function() { Joystick.onMouseUp(); });
-            canvas.addEventListener("mouseleave", function() { Joystick.onMouseUp(); });
+        var KeyTable = {
+            tableHeader : [
+                `KEY ${Constants.multiKeyPrefix}`, 
+                `MOUSE ${Constants.mousePrefix}`, 
+                `MEDIA ${Constants.mediaPrefix}`, 
+                `SYSTEM ${Constants.systemPrefix}`
+            ],
 
-            canvas.addEventListener("touchstart", function(e) {
-                e.preventDefault();
-                Joystick.onMouseDown(e);
-            });
-            canvas.addEventListener("touchmove", function(e) {
-                e.preventDefault();
-                Joystick.onMouseMove(e);
-            });
-            canvas.addEventListener("touchend", function() { Joystick.onMouseUp(); });
+            tableData : [
+                ["LEFT_CTRL", "LEFT_SHIFT", "LEFT_ALT", "LEFT_GUI", "RIGHT_CTRL", "RIGHT_SHIFT", "RIGHT_ALT", "RIGHT_GUI", "UP_ARROW", "DOWN_ARROW", "LEFT_ARROW", "RIGHT_ARROW", "MENU", "SPACE", "BACKSPACE", "TAB", "RETURN", "ESC", "INSERT", "DELETE", "PAGE_UP", "PAGE_DOWN", "HOME", "END", "NUM_LOCK", "CAPS_LOCK", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23", "F24", "PRINT_SCREEN", "SCROLL_LOCK", "PAUSE"],
+                ["LEFT", "RIGHT", "MIDDLE", "BACKWARD", "FORWARD", "ALL"],
+                ["VOLUME_UP", "VOLUME_DOWN", "MUTE", "PLAY_PAUSE", "STOP", "BRIGHTNESS_UP", "BRIGHTNESS_DOWN"],
+                ["POWER_OFF", "STANDBY", "WAKE_HOST"]
+            ],
+
+            initTable : function() {
+                var table = document.createElement("table");
+                var thead = document.createElement("thead");
+                var tbody = document.createElement("tbody");
+
+                var tr = document.createElement("tr");
+                this.tableHeader.forEach(function(header) {
+                    var th = document.createElement("th");
+                    th.textContent = header;
+                    tr.appendChild(th);
+                });
+                thead.appendChild(tr); 
+                table.appendChild(thead);
+
+                var maxDataLength = Math.max(...this.tableData.map(arr => arr.length));
+
+                for (var i = 0; i < maxDataLength; i++) {
+                    var tr = document.createElement("tr");
+                    for (var j = 0; j < this.tableHeader.length; j++) {
+                        var td = document.createElement("td");
+
+                        td.textContent = this.tableData[j][i] || "";;
+                        td.type = this.tableHeader[j].split(" ")[1];
+
+                        td.addEventListener("click", function() {
+                            KeyTable.cellClicked(this)
+                        });
+
+                        tr.appendChild(td);
+                    }
+                    tbody.appendChild(tr);
+                }
+
+                table.appendChild(tbody);
+                document.getElementById("keyTable").appendChild(table);
+            },
+
+            cellClicked : function(cell) {
+                var instantRun = document.getElementById("InstantRun").checked;
+                if (instantRun) CommandSender.sendCommand(cell.type + cell.textContent);
+                else this.insertFromClicked(cell);
+            },
+
+            insertFromClicked : function(cell) {
+                var currentText = document.getElementsByName("commandInput")[0].value;
+                if (currentText.length < 1) {
+                    TextInserter.insert(cell.type + cell.textContent);
+                    return;
+                }
+
+                var currentCommand = currentText.split(new RegExp(Constants.waitPrefix + "|" + Constants.waitSuffix + "|;;"))
+                var lastCommand = currentCommand[currentCommand.length - 1];
+                new RegExp(Constants.waitPrefix + "|" + Constants.waitSuffix + "|;;")
+                if (lastCommand.startsWith(Constants.multiKeyPrefix) && cell.type === Constants.multiKeyPrefix) {
+                    TextInserter.insert(Constants.multiKeyPartion + cell.textContent);
+                } else {
+                    var prefix = lastCommand !== '' ? Constants.connamdEnd : '';
+                    TextInserter.insert(prefix + cell.type + cell.textContent);
+                }
+            }
+        };
+
+        function initialize() {
+            KeyTable.initTable();
+            Joystick.initiJoysitck();
+            Slider.initSlider();
+        }
+
+        window.onload = function() {
+            initialize();
         };
 
         window.sendCommandFromExternal = function(command) {
@@ -220,23 +414,30 @@ const char* webpage = R"=====(
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
             margin: 0;
-            padding: 20px;
+            padding-top: 20px;
+            padding-bottom: 20px;
         }
         
         h1 {
             text-align: center;
             color: #333;
-            font-size: 2em; /* 預設字體大小 */
+            font-size: 2em;
         }
     
         .container {
             max-width: 800px;
-            margin: 0 auto;
+            margin: 0.5em auto;
             background: #fff;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             width: 100%;
+        }
+
+        .flex-container {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
         }
     
         input[type="text"], input[type="number"], select {
@@ -253,6 +454,117 @@ const char* webpage = R"=====(
             border-color: #007bff;
             outline: none;
         }
+
+        input[type="file"] {
+            display: none;           
+        }
+
+        .custom-file-upload {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        .custom-file-upload:hover {
+            background-color: #45a049;
+        }
+
+        .file-name {
+            margin: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #ddd;
+            border-radius: 0;
+            outline: none;
+            transition: background 0.3s;
+        }
+    
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 30px;
+            height: 15px;
+            background: #2857a7;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+    
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 8px;
+            background: #2857a7;
+            cursor: pointer;
+        }
+    
+        input[type="range"]:hover {
+            background: #ccc;
+        }
+
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 1em;
+            font-family: Arial, sans-serif;
+            font-size: 1rem;
+            margin-bottom: 1em;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 3.75em;
+            height: 2.125em;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 2em;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 1.625em;
+            width: 1.625em;
+            left: 0.25em;
+            bottom: 0.25em;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2857a7;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(1.625em);
+        }
     
         button {
             background-color: #2857a7;
@@ -264,11 +576,16 @@ const char* webpage = R"=====(
             font-size: 16px;
             margin-right: 10px;
             transition: background-color 0.3s;
-            width: auto; /* 根據內容自適應 */
+            width: auto;
         }
     
         button:hover {
             background-color: #282188;
+        }
+
+        #refreshButton {
+            height: 100%;
+            margin-left: auto;
         }
     
         #response {
@@ -281,16 +598,20 @@ const char* webpage = R"=====(
         }
     
         #joystick {
-            border-radius: 15px; /* 圓角 */
-            background-color: #fff; /* 背景顏色 */
+            border-radius: 15px;
+            background-color: #fff;
+            margin-right: 20px;
         }
     
-        label {
-            margin-top: 15px;
-            display: block;
+        .styled-label {
+            font-family: 'Arial', sans-serif;
             font-size: 16px;
+            color: #333;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            display: inline-block;
         }
-    
+
         select {
             width: calc(100%);
             padding: 10px;
@@ -327,35 +648,76 @@ const char* webpage = R"=====(
         td {
             vertical-align: top;
         }
-    
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 100%;
-            height: 8px;
-            background: #ddd;
-            border-radius: 0;
-            outline: none;
-            transition: background 0.3s;
+
+        .table-container {
+            overflow-x: auto;
+            max-height: 20em;
+            overflow-y: auto; 
         }
-    
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 30px;
-            height: 15px;
-            background: #2857a7;
-            cursor: pointer;
+
+        .slider-simulator-container {
+            text-align: center;
+            margin: 10px;
         }
-    
-        input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 8px;
-            background: #2857a7;
-            cursor: pointer;
+
+        .slider-simulator {
+            width: 40px;
+            height: 300px;
+            background-color: #2857a7;
+            border-radius: 10px;
+            margin: 10px auto;
+            position: relative;
+            transition: background-color 0.3s ease;
         }
-    
-        input[type="range"]:hover {
-            background: #ccc;
+
+        .scrolling-up {
+            animation: slide-up 0.5s infinite;
+        }
+
+        .scrolling-down {
+            animation: slide-down 0.5s infinite;
+        }
+
+        @keyframes slide-up {
+            0% {
+                background-color: #2857a7;
+                transform: translateY(0);
+            }
+            25% {
+                transform: translateY(-20px);
+            }
+            50% {
+                background-color: #282188; 
+                transform: translateY(-5px);
+            }
+            75% {
+                transform: translateY(0);
+            }
+            100% {
+                background-color: #2857a7;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slide-down {
+            0% {
+                background-color: #2857a7;
+                transform: translateY(0);
+            }
+            25% {
+                transform: translateY(20px);
+            }
+            50% {
+                background-color: #282188;
+                transform: translateY(5px);
+            }
+            75% {
+                transform: translateY(0);
+            }
+            100% {
+                background-color: #2857a7;
+                transform: translateY(0);
+            }
         }
     
         @media (max-width: 600px) {
@@ -394,136 +756,87 @@ const char* webpage = R"=====(
     
 </head>
 <body>
-    <h1>ESP32-WirelessUSB Dashboard</h1>
+    <h1>HID-BadUSB Dashboard</h1>
 
+    <div id="commandBox" class="container">
+        <label for="commandInput" class="styled-label">Command:</label>
+        <input type="text" name="commandInput">
+        <button id='sendCommandFromExternal' onclick="CommandSender.sendCommand();">Submit</button>
+        <button onclick="TextInserter.clear()">Clear</button><br><br>
+        <div id="response">Ready For Command</div><br>
 
-    <input type="text" name="commandInput">
-    <button id='sendCommandFromExternal' onclick="CommandSender.sendCommand();">Submit</button><br><br>
-    <div id="response">Ready For Command</div><br>
+        <select id="symbolDropdown">
+            <option value=";;">CommandEnd</option>
+            <option value="--">MultiKeyPartion</option>
+            <option value="$">MultiKey</option>
+            <option value="@">Mouse</option>
+            <option value="MDI/">Media</option>
+            <option value="SYS/">System</option>
+        </select>
+        <button onclick="TextInserter.insertFromSelect('symbolDropdown')">AddSymbol</button><br><br>
+    </div>
 
-    <button onclick="TextInserter.insert(';;')">CommandEnd</button>
-    <button onclick="TextInserter.insert('--')">ActionEnd</button>
-    <button onclick="TextInserter.insert('$')">MultiKey</button>
-    <button onclick="TextInserter.insert('@')">Mouse</button>
-    <button onclick="TextInserter.insert('MDI/')">Media</button>
-    <button onclick="TextInserter.insert('SYS/')">System</button><br>
+    <div id="quickCommand" class="container"> 
+        <div class="switch-container">
+            <label class="switch">
+                <input type="checkbox" id="InstantRun">
+                <span class="slider"></span>
+            </label>
+            <label for="InstantRun" class="styled-label">InstantRun</label>
+        </div>
 
-    <label for="waitTime">Wait Time (ms):</label>
-    <input type="number" id="waitTime" min="0" value="1000">
-    <button onclick="TextInserter.addWaitCommand()">Add Wait Command</button><br><br>
+        <div class="table-container"><div id="keyTable"></div></div>
+        
+    </div>
 
-    <select id="dropdown">
-        <option value="$LEFT_ALT--F4">CloseTab</option>
-        <option value="$LEFT_GUI--rWAS/WT/100WAE/https://www.youtube.com/watch?v=dQw4w9WgXcQWAS/WT/500WAE/$RETURN">RickRoll</option>
-        <option value="@LEFT">MOUSE_LEFT</option>
-        <option value="$LEFT_GUI">WINDOWS</option>
-        <option value="$LEFT_SHIFT">SHIFT</option>
-        <option value="$LEFT_CTRL">CTRL</option>
-    </select>
-    <button onclick="TextInserter.insertFromSelect()">AddAction</button>
-    <button onclick="CommandSender.sendFromSelect()">RunAction</button><br><br>
+    <div id="scriptArea" class="container">
+        <label for="waitTime" class="styled-label">Wait Time (ms):</label>
+        <input type="number" id="waitTime" min="0" value="1000">
+        <button onclick="TextInserter.addWaitCommand()">Add Wait Command</button><br><br>
 
-    <label for="joystickMultiplier">Cursor Speed:</label>
-    <input type="range" id="joystickMultiplier" min="1" max="10" value="1">
-    <span id="multiplierValue">1</span><br><br>
+        <select id="scriptDropdown">
+            <option value="$LEFT_ALT--F4">CloseTab</option>
+            <option value="$LEFT_GUI--rWAS/WT/100WAE/https://www.youtube.com/watch?v=dQw4w9WgXcQWAS/WT/500WAE/$RETURN">RickRoll</option>
+        </select>
+        <div class="flex-container">
+            <button onclick="CommandSender.sendFromSelect()">RunScript</button>
+            <label class="custom-file-upload">
+                <input type="file" id="fileInput" accept=".json">
+                Upload Script
+            </label>
+        
+            <div id="fileName" class="file-name">No file selected</div>
+        </div>
+    </div>
     
-    <canvas id="joystick" width="300" height="300" style="border:1px solid #000;"></canvas><br><br>
+    <div id="cursorControl" class="container">
+        <label for="joystickMultiplier" class="styled-label">Cursor Speed:</label>
+        <input type="range" id="joystickMultiplier" min="1" max="10" value="1">
+        <span id="multiplierValue">1</span><br><br>
+        
+        <div class="flex-container">
+            <canvas id="joystick" width="300" height="300" style="border:1px solid #000;"></canvas>
+            <div class="slider-simulator-container">
+                <div id="sliderSimulator" class="slider-simulator"></div>
+            </div>
+        </div>
+    </div>
 
-    <table>
-        <tr>
-            <th>KEY</th>
-            <th>MOUSE</th>
-            <th>MEDIA</th>
-            <th>SYSTEM</th>
-        </tr>
-        <tr>
-            <td>
-                LEFT_CTRL<br>
-                LEFT_SHIFT<br>
-                LEFT_ALT<br>
-                LEFT_GUI<br>
-                RIGHT_CTRL<br>
-                RIGHT_SHIFT<br>
-                RIGHT_ALT<br>
-                RIGHT_GUI<br>
-                UP_ARROW<br>
-                DOWN_ARROW<br>
-                LEFT_ARROW<br>
-                RIGHT_ARROW<br>
-                MENU<br>
-                SPACE<br>
-                BACKSPACE<br>
-                TAB<br>
-                RETURN<br>
-                ESC<br>
-                INSERT<br>
-                DELETE<br>
-                PAGE_UP<br>
-                PAGE_DOWN<br>
-                HOME<br>
-                END<br>
-                NUM_LOCK<br>
-                CAPS_LOCK<br>
-                F1<br>
-                F2<br>
-                F3<br>
-                F4<br>
-                F5<br>
-                F6<br>
-                F7<br>
-                F8<br>
-                F9<br>
-                F10<br>
-                F11<br>
-                F12<br>
-                F13<br>
-                F14<br>
-                F15<br>
-                F16<br>
-                F17<br>
-                F18<br>
-                F19<br>
-                F20<br>
-                F21<br>
-                F22<br>
-                F23<br>
-                F24<br>
-                PRINT_SCREEN<br>
-                SCROLL_LOCK<br>
-                PAUSE
-            </td>
-            <td>
-                LEFT<br>
-                RIGHT<br>
-                MIDDLE<br>
-                BACKWARD<br>
-                FORWARD<br>
-                ALL
-            </td>
-            <td>
-                VOLUME_UP<br>
-                VOLUME_DOWN<br>
-                MUTE<br>
-                PLAY_PAUSE<br>
-                STOP<br>
-                BRIGHTNESS_UP<br>
-                BRIGHTNESS_DOWN
-            </td>
-            <td>
-                POWER_OFF<br>
-                STANDBY<br>
-                WAKE_HOST
-            </td>
-        </tr>
-    </table>
+    <div id="ICstate" class="container">
+        <div class="flex-container">
+            <div>
+                <p>IC Temperature: <span id="ICTempValue">Unknown</span> °C</p>
+                <p>Free Heap: <span id="heapValue">Unknown</span> Bytes</p>
+                <p>Uptime: <span id="uptimeValue">Unknown</span> Miliseconds</p>
+            </div>
+            
+            <button id="refreshButton" onclick="StatusBar.refreshICState()">Refresh</button>
+        </div>
+    </div>
 
-    <script>
-        var multiplierInput = document.getElementById("joystickMultiplier");
-        var multiplierDisplay = document.getElementById("multiplierValue");
-        multiplierInput.oninput = function() {
-            multiplierDisplay.textContent = this.value;
-        };
-    </script>
+    <footer style="padding: 10px;">
+        HID-BadUSB MIT License | <a href="https://github.com/alanwu-9582">alanwu-9582</a>
+    </footer>
 </body>
 </html>
 
