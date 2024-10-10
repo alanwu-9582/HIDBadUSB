@@ -31,14 +31,14 @@ const char* webpage = R"=====(
             commandInterval: null,
 
             initiJoysitck: function() {
-                var multiplierDisplay = document.getElementById("multiplierValue");
-                var multiplierInput = document.getElementById("joystickMultiplier");
+                const multiplierDisplay = document.getElementById("multiplierValue");
+                const multiplierInput = document.getElementById("joystickMultiplier");
                 multiplierInput.oninput = function() {
                     multiplierDisplay.textContent = this.value;
                 };
 
                 this.draw();
-                var canvas = document.getElementById("joystick");
+                const canvas = document.getElementById("joystick");
                 canvas.addEventListener("mousedown", function(e) { Joystick.onMouseDown(e); });
                 canvas.addEventListener("mousemove", function(e) { Joystick.onMouseMove(e); });
                 canvas.addEventListener("mouseup", function() { Joystick.onMouseUp(); });
@@ -56,8 +56,8 @@ const char* webpage = R"=====(
             },
 
             draw: function() {
-                var canvas = document.getElementById("joystick");
-                var ctx = canvas.getContext("2d");
+                const canvas = document.getElementById("joystick");
+                const ctx = canvas.getContext("2d");
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                 ctx.beginPath();
@@ -74,8 +74,8 @@ const char* webpage = R"=====(
             },
 
             move: function(e) {
-                var canvas = document.getElementById("joystick");
-                var rect = canvas.getBoundingClientRect();
+                const canvas = document.getElementById("joystick");
+                const rect = canvas.getBoundingClientRect();
                 var x, y;
 
                 if (e.touches) {
@@ -143,8 +143,8 @@ const char* webpage = R"=====(
                 this.commandInterval = null;
                 if (this.active) CommandSender.sendCommand('@MOVE0,0,0,0');
                 this.active = false;
-                this.stickPos.x = this.center.x;
-                this.stickPos.y = this.center.y;
+                this.stickPos = { x: this.center.x, y: this.center.y };
+                this.lastStickPos = { x: this.center.x, y: this.center.y };
                 this.draw();
             }
         };
@@ -154,24 +154,27 @@ const char* webpage = R"=====(
             touchStartY: 0,
 
             initSlider : function() {
-                var sliderSimulator = document.getElementById('sliderSimulator')
-                sliderSimulator.addEventListener('wheel', function(e) { Slider.simulateScroll(e); });
+                const sliderSimulator = document.getElementById('sliderSimulator')
+                sliderSimulator.addEventListener('wheel', function(e) {
+                    e.preventDefault();
+                    Slider.simulateScroll(e, false);
+                });
                 sliderSimulator.addEventListener('touchstart', function(e) { Slider.handleTouchStart(e); });
                 sliderSimulator.addEventListener('touchmove', function(e) { Slider.handleTouchMove(e); });
             },
 
-            simulateScroll: function(e) {
-                e.preventDefault();
-                var sliderSimulator = document.getElementById('sliderSimulator')
+            simulateScroll: function(e, reverseDisplay) {
+                const sliderSimulator = document.getElementById('sliderSimulator')
                 
-                var multiplier = document.getElementById("joystickMultiplier").value;
+                const multiplier = document.getElementById("joystickMultiplier").value;
                 var direction = e.deltaY > 0 ? 1 : -1;
-                CommandSender.sendCommand(`${Constants.mousePrefix}MOVE0,0,${direction * 10 * multiplier},0`)
+                CommandSender.sendCommand(`${Constants.mousePrefix}MOVE0,0,${direction * 5 * multiplier},0`)
+
 
                 if (!this.scrolling) {
                     this.scrolling = true;
 
-                    if (e.deltaY > 0) {
+                    if ((reverseDisplay ? -direction : direction) > 0) {
                         sliderSimulator.classList.add('scrolling-down');
                         sliderSimulator.classList.remove('scrolling-up');
                     } else {
@@ -187,7 +190,6 @@ const char* webpage = R"=====(
                 }
             },
 
-            
             handleTouchStart: function(e) {
                 e.preventDefault()
                 this.touchStartY = e.touches[0].clientY;
@@ -202,16 +204,19 @@ const char* webpage = R"=====(
                 const touchY = e.touches[0].clientY;
                 const deltaY = this.touchStartY - touchY;
 
-                this.simulateScroll({ deltaY: deltaY });
+                this.simulateScroll({ deltaY: deltaY }, true);
 
                 this.touchStartY = touchY;
-                alert("touchMove")
             }
         }
 
         var StatusBar = {
-            update: function(status) {
+            updateCommand: function(status) {
                 document.getElementById("response").innerHTML = status;
+            },
+
+            updateFirmware: function(status) {
+                document.getElementById("dataResponse").innerHTML = status;
             },
 
             refreshICState: function() {
@@ -222,13 +227,26 @@ const char* webpage = R"=====(
                             var response = this.responseText.split(",");
                             
                             document.getElementById("ICTempValue").textContent = response[0];
-                            document.getElementById("heapValue").textContent = response[1];
-                            document.getElementById("uptimeValue").textContent = response[2];
+                            document.getElementById("heapValue").textContent = Math.round(Number(response[1]) / 1024, 2);
+                            document.getElementById("uptimeValue").textContent = StatusBar.msToTime(Number(response[2]));
                         }
                     }
                 };
                 xhttp.open("GET", "/icstate", true);
                 xhttp.send();
+            },
+
+            msToTime: function (duration) {
+                var milliseconds = Math.floor((duration % 1000) / 100),
+                    seconds = Math.floor((duration / 1000) % 60),
+                    minutes = Math.floor((duration / (1000 * 60)) % 60),
+                    hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+
+                hours = (hours < 10) ? "0" + hours : hours;
+                minutes = (minutes < 10) ? "0" + minutes : minutes;
+                seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+                return hours + ":" + minutes + ":" + seconds + "." + milliseconds;
             }
         };
 
@@ -239,7 +257,7 @@ const char* webpage = R"=====(
                     xhttp.onreadystatechange = function() {
                         if (this.readyState == 4) {
                             if (this.status == 200) {
-                                StatusBar.update(this.responseText);
+                                StatusBar.updateCommand(this.responseText);
                             }
                         }
                     };
@@ -258,12 +276,12 @@ const char* webpage = R"=====(
                 for (let cmd of commands) {
                     if (cmd.startsWith(Constants.waitHead)) {
                         var time = parseInt(cmd.substring(3).trim());
-                        StatusBar.update("Waiting for " + time + "ms...");
+                        StatusBar.updateCommand("Waiting for " + time + "ms...");
                         await new Promise(resolve => setTimeout(resolve, time));
 
 
                     } else {
-                        StatusBar.update("Sending command: " + cmd);
+                        StatusBar.updateCommand("Sending command: " + cmd);
                         await this.sendHttpRequest(cmd);
                     }
              }   
@@ -281,7 +299,7 @@ const char* webpage = R"=====(
                 xhttp.onreadystatechange = function() {
                     if (this.readyState == 4) {
                         if (this.status == 200) {
-                            StatusBar.update();
+                            StatusBar.updateCommand();
                         }
                     }
                 };
@@ -391,10 +409,118 @@ const char* webpage = R"=====(
             }
         };
 
+        var FileManager = {
+            initFileManager: function() {
+                const fileInput = document.getElementById("scriptFileInput");
+                fileInput.addEventListener("change", function(e) { FileManager.handleScriptUplaod(e) });
+
+                const firmwareUploadBtn = document.getElementById("updateFirmwareBtn");
+                firmwareUploadBtn.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    FileManager.uploadFirmware();
+                });
+            },
+
+            handleScriptUplaod: function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = JSON.parse(e.target.result);
+                    if (content.type === "USBHID-Script") {
+                        const fileName = document.getElementById('scriptFileName');
+                        fileName.textContent = file.name;
+
+                        FileManager.addScripts(content.scripts);
+                    }
+                };
+
+                reader.readAsText(file);
+            },
+
+            addScripts: function(scripts) {
+                const fileName = document.getElementById('scriptFileName');
+                const scriptDropdown = document.getElementById("scriptDropdown");
+
+                var skippedCount = 0;
+                scripts.forEach(script => {
+                    var isExist = Array.from(scriptDropdown.options).some(option => option.textContent === script.name);
+                    if (!isExist) {
+                        const option = document.createElement("option");
+                        option.textContent = script.name;
+                        option.value = script.command;
+                        scriptDropdown.appendChild(option);
+
+                    } else skippedCount++;
+                });
+
+                fileName.textContent = `Added ${scripts.length - skippedCount} scripts ${skippedCount > 0 ? `(${skippedCount} skipped)` : ''}`;
+            },
+
+            handleFirmwareUplaod: function(e) {
+                const file = document.getElementById('firmwareFileinput').files[0];
+                if (!file) return;
+
+                const fileName = document.getElementById('firmwareFileName');
+                fileName.textContent = file.name;
+            },
+
+            uploadFirmware: function() {
+                var request = new XMLHttpRequest();
+
+
+                request.onerror = function() { StatusBar.updateFirmware('ERROR: Connection error!'); };
+                request.ontimeout = function() { StatusBar.updateFirmware('ERROR: Connection timeout!'); };
+
+                request.onreadystatechange = function() {
+                    if (this.status == 404) {
+                        StatusBar.updateFirmware('ERROR: 404 Not Found!');
+                    }
+
+                    if (this.readyState == 4) {
+                        switch (this.status) {
+                            case 200 :
+                                StatusBar.updateFirmware(this.responseText);
+                                // window.fileSelection.value = '';
+                                // window.fileSelection.disabled = false;
+                                // window.uploadFileButton.disabled = true;
+                                break;
+                            default :  StatusBar.updateFirmware('http result code: ' + this.status);
+                        }
+                    }
+                }
+
+                request.upload.addEventListener('progress', function(event) {
+                    const percent = (event.loaded / event.total) * 100;
+                    StatusBar.updateFirmware(`${Math.round(percent)}% uploaded. Please wait...`);
+                    var progress = document.getElementById('uploadProgressBar');
+                    progress.value = event.loaded;
+                    progress.max = event.total;
+                });
+
+                request.addEventListener('load', function() {
+                    var progress = document.getElementById('uploadProgressBar');
+                    progress.value = 0;
+                    progress.max = 0;
+                });
+
+                request.open('POST', '/updateFirmware');
+                const file = document.getElementById('firmwareFileinput').files[0];
+
+                var formData = new FormData();
+                formData.append('firmware', file);
+                StatusBar.updateFirmware('Initializing upload...');
+
+                request.send(formData);
+            }
+        };   
+
         function initialize() {
             KeyTable.initTable();
             Joystick.initiJoysitck();
             Slider.initSlider();
+            FileManager.initFileManager();
         }
 
         window.onload = function() {
@@ -543,7 +669,7 @@ const char* webpage = R"=====(
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 2em;
+            border-radius: 10px;
         }
 
         .slider:before {
@@ -555,7 +681,7 @@ const char* webpage = R"=====(
             bottom: 0.25em;
             background-color: white;
             transition: .4s;
-            border-radius: 50%;
+            border-radius: 30%;
         }
 
         input:checked + .slider {
@@ -565,8 +691,9 @@ const char* webpage = R"=====(
         input:checked + .slider:before {
             transform: translateX(1.625em);
         }
+
     
-        button {
+        button, input[type="submit"] {
             background-color: #2857a7;
             color: white;
             border: none;
@@ -579,16 +706,16 @@ const char* webpage = R"=====(
             width: auto;
         }
     
-        button:hover {
+        button:hover, input[type="submit"]:hover {
             background-color: #282188;
         }
 
-        #refreshButton {
+        .stickRightBtn {
             height: 100%;
             margin-left: auto;
         }
     
-        #response {
+        #response, #dataResponse {
             background-color: #e7f1ff;
             padding: 10px;
             border: 1px solid #cce5ff;
@@ -678,6 +805,24 @@ const char* webpage = R"=====(
             animation: slide-down 0.5s infinite;
         }
 
+        progress {
+            appearance: none;
+            margin: 5px 0;
+            height: 25px;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: background-color 0.3s;
+        }
+
+        progress::-webkit-progress-bar {
+            background-color: #d1cfcf;
+        }
+
+        progress::-webkit-progress-value {
+            background-color: #4caf50;
+            border-radius: 10px
+        }
+
         @keyframes slide-up {
             0% {
                 background-color: #2857a7;
@@ -729,7 +874,7 @@ const char* webpage = R"=====(
                 padding: 15px;
             }
     
-            button {
+            button, input[type="submit"] {
                 width: 100%;
                 margin: 5px 0;
             }
@@ -753,7 +898,6 @@ const char* webpage = R"=====(
             }
         }
     </style>
-    
 </head>
 <body>
     <h1>HID-BadUSB Dashboard</h1>
@@ -801,11 +945,11 @@ const char* webpage = R"=====(
         <div class="flex-container">
             <button onclick="CommandSender.sendFromSelect()">RunScript</button>
             <label class="custom-file-upload">
-                <input type="file" id="fileInput" accept=".json">
+                <input type="file" id="scriptFileInput" accept=".usbhidscript">
                 Upload Script
             </label>
         
-            <div id="fileName" class="file-name">No file selected</div>
+            <div id="scriptFileName" class="file-name">No file selected</div>
         </div>
     </div>
     
@@ -817,7 +961,7 @@ const char* webpage = R"=====(
         <div class="flex-container">
             <canvas id="joystick" width="300" height="300" style="border:1px solid #000;"></canvas>
             <div class="slider-simulator-container">
-                <div id="sliderSimulator" class="slider-simulator"></div>
+                <canvas id="sliderSimulator" class="slider-simulator"></canvas>
             </div>
         </div>
     </div>
@@ -825,13 +969,24 @@ const char* webpage = R"=====(
     <div id="ICstate" class="container">
         <div class="flex-container">
             <div>
-                <p>IC Temperature: <span id="ICTempValue">Unknown</span> °C</p>
-                <p>Free Heap: <span id="heapValue">Unknown</span> Bytes</p>
+                <p>IC Temperature: <span id="ICTempValue">Unknown</span> Celsius</p>
+                <p>Free Heap: <span id="heapValue">Unknown</span> KB</p>
                 <p>Uptime: <span id="uptimeValue">Unknown</span> Miliseconds</p>
             </div>
             
-            <button id="refreshButton" onclick="StatusBar.refreshICState()">Refresh</button>
+            <button id="refreshButton" class="stickRightBtn" onclick="StatusBar.refreshICState()">Refresh</button>
         </div>
+    </div>
+
+    <div id="firmware" class="container">
+        <div id="dataResponse" style="margin-bottom: 10px;">Select Firmware</div>
+        <form method='POST' action='/updateFirmware' enctype='multipart/form-data' class="flex-container">
+            <input type="file" id="firmwareFileinput" accept=".bin", onchange="FileManager.handleFirmwareUplaod()">
+            <label class="custom-file-upload" for="firmwareFileinput">Upload firmware</label> 
+            <div id="firmwareFileName" class="file-name">No file selected</div>
+            <progress id="uploadProgressBar" value="0" max="0"></progress>
+            <input id="updateFirmwareBtn" class="stickRightBtn" type='submit' value='Update Firmware'>
+        </form>
     </div>
 
     <footer style="padding: 10px;">

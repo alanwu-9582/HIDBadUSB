@@ -21,4 +21,5 @@ private:
 public:
     WifiServerCmd(WifiServerSubsystem& wifiServer, USBHIDController& controller);
     void begin();
+    void execute();
 };

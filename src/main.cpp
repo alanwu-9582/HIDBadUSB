@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <ArduinoOTA.h>
+// #include <ArduinoOTA.h>
 
 #include "password.h"
 #include "Subsystems/USBHIDController.h"
@@ -17,9 +17,8 @@ void setup() {
 	Serial.println(WifiServer.initWifi());
 
 	ServerCmd.begin();
-	ArduinoOTA.begin();
 }
 
 void loop() {
-	ArduinoOTA.handle();
+	ServerCmd.execute();
 }
